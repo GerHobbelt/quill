@@ -77,9 +77,9 @@ private:
    */
   struct BacktraceLogRecord
   {
-    BacktraceLogRecord(std::string thread_id, std::string thread_name,
-                       std::unique_ptr<BaseEvent, FreeListAllocatorDeleter<BaseEvent>> base_record)
-      : thread_id(std::move(thread_id)), thread_name(std::move(thread_name)), base_record(std::move(base_record))
+    BacktraceLogRecord(std::string thread_id_, std::string thread_name_,
+                       std::unique_ptr<BaseEvent, FreeListAllocatorDeleter<BaseEvent>> base_record_)
+      : thread_id(std::move(thread_id_)), thread_name(std::move(thread_name_)), base_record(std::move(base_record_))
     {
     }
 
@@ -95,10 +95,10 @@ private:
    */
   struct StoredRecordInfo
   {
-    explicit StoredRecordInfo(uint32_t capacity) : capacity(capacity)
+    explicit StoredRecordInfo(uint32_t capacity_) : capacity(capacity_)
     {
       // also reserve the vector
-      stored_records_collection.reserve(capacity);
+      stored_records_collection.reserve(capacity_);
     }
 
     uint32_t capacity;                                   /** The maximum capacity for this */
