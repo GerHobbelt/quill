@@ -219,17 +219,6 @@
 #define QUILL_LOG_BACKTRACE(logger, fmt, ...)                                                      \
   QUILL_BACKTRACE_LOGGER_CALL(logger, fmt, ##__VA_ARGS__)
 
-#define HAS_COMMA(...) HAS_COMMA_16__(__VA_ARGS__, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0)
-#define HAS_COMMA_16__(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, ...) _15
-#define CAT_(X,Y) X##Y
-#define CAT(X,Y) CAT_(X,Y)
-#define QUILL2_LOG_TRACE_L3(...) CAT(QUILL2_LOG_TRACE_L3,HAS_COMMA(__VA_ARGS__))(__VA_ARGS__)
-#define QUILL2_LOG_TRACE_L30(logger, fmt) QUILL_LOG_TRACE_L3(logger, fmt)
-#define QUILL2_LOG_TRACE_L31(logger, fmt, ...) QUILL_LOG_TRACE_L3(logger, fmt, ##__VA_ARGS__)
-#define QUILL2_LOG_DEBUG(...) CAT(QUILL2_LOG_DEBUG,HAS_COMMA(__VA_ARGS__))(__VA_ARGS__)
-#define QUILL2_LOG_DEBUG0(logger, fmt) QUILL_LOG_DEBUG(logger, fmt)
-#define QUILL2_LOG_DEBUG1(logger, fmt, ...) QUILL_LOG_DEBUG(logger, fmt, ##__VA_ARGS__)
-
 #if !defined(QUILL_DISABLE_NON_PREFIXED_MACROS)
   #define LOG_TRACE_L3(logger, fmt, ...) QUILL_LOG_TRACE_L3(logger, fmt, ##__VA_ARGS__)
   #define LOG_TRACE_L2(logger, fmt, ...) QUILL_LOG_TRACE_L2(logger, fmt, ##__VA_ARGS__)
