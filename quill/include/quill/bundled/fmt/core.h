@@ -225,6 +225,12 @@
 #  define FMT_MODULE_EXPORT_END
 #  define FMT_BEGIN_DETAIL_NAMESPACE namespace detail {
 #  define FMT_END_DETAIL_NAMESPACE }
+#else
+#define FMT_MODULE_EXPORT
+#define FMT_MODULE_EXPORT_BEGIN
+#define FMT_MODULE_EXPORT_END
+#define FMT_BEGIN_DETAIL_NAMESPACE namespace detail {
+#define FMT_END_DETAIL_NAMESPACE }
 #endif
 
 #if !defined(FMT_HEADER_ONLY) && defined(_WIN32)
