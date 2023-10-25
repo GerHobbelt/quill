@@ -15,6 +15,7 @@ int main()
   quill::Config cfg;
   cfg.backend_thread_yield = false;
   cfg.backend_thread_cpu_affinity = 1;
+  cfg.backend_thread_use_transit_buffer = false;
 
   quill::configure(cfg);
 
