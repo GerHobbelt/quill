@@ -101,9 +101,19 @@ public:
       capacity = capacity * 2ull;
     }
 
-    if (QUILL_UNLIKELY(capacity > std::numeric_limits<uint32_t>::max()))
+    // bounded queue max power of 2 capacity since uint32_t type is used to hold the value 2147483648 bytes
+    constexpr uint64_t max_bounded_queue_capacity = (std::numeric_limits<uint32_t>::max() >> 1) + 1;
+    if (QUILL_UNLIKELY(capacity > max_bounded_queue_capacity))
     {
-      capacity = std::numeric_limits<uint32_t>::max();
+      if ((nbytes + 1) > max_bounded_queue_capacity)
+      {
+        QUILL_THROW(QuillError{
+          "logging single messages greater than 2 GB is not supported. nbytes: " + std::to_string(nbytes) +
+          " capacity: " + std::to_string(capacity) +
+          " max_bounded_queue_capacity: " + std::to_string(max_bounded_queue_capacity)});
+      }
+
+      capacity = max_bounded_queue_capacity;
     }
 
     // commit previous write to the old queue before switching
