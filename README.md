@@ -6,13 +6,13 @@
 
   <div>
     <a href="https://github.com/odygrd/quill/actions?query=workflow%3Alinux">
-      <img src="https://img.shields.io/github/workflow/status/odygrd/quill/linux?label=linux&logo=linux&style=flat-square" alt="linux-ci" />
+      <img src="https://img.shields.io/github/actions/workflow/status/odygrd/quill/linux.yml?branch=master&label=linux&logo=linux&style=flat-square" alt="linux-ci" />
     </a>
     <a href="https://github.com/odygrd/quill/actions?query=workflow%3Amacos">
-      <img src="https://img.shields.io/github/workflow/status/odygrd/quill/macos?label=macos&logo=apple&logoColor=white&style=flat-square" alt="macos-ci" />
+      <img src="https://img.shields.io/github/actions/workflow/status/odygrd/quill/macos.yml?branch=master&label=macos&logo=apple&logoColor=white&style=flat-square" alt="macos-ci" />
     </a>
     <a href="https://github.com/odygrd/quill/actions?query=workflow%3Awindows">
-      <img src="https://img.shields.io/github/workflow/status/odygrd/quill/windows?label=windows&logo=windows&logoColor=blue&style=flat-square" alt="windows-ci" />
+      <img src="https://img.shields.io/github/actions/workflow/status/odygrd/quill/windows.yml?branch=master&label=windows&logo=windows&logoColor=blue&style=flat-square" alt="windows-ci" />
     </a>
     <a href="https://cloud.drone.io/odygrd/quill">
       <img src="https://img.shields.io/drone/build/odygrd/quill/master?label=ARM&logo=drone&style=flat-square" alt="drone-ci" />
@@ -35,8 +35,8 @@
     <a href="https://opensource.org/licenses/MIT">
       <img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="license" />
     </a>
-    <a href="https://en.wikipedia.org/wiki/C%2B%2B14">
-      <img src="https://img.shields.io/badge/language-C%2B%2B14-red.svg?style=flat-square" alt="language" />
+    <a href="https://en.wikipedia.org/wiki/C%2B%2B17">
+      <img src="https://img.shields.io/badge/language-C%2B%2B17%20%2F%20C%2B%2B14-red.svg?style=flat-square" alt="language" />
     </a>
   </div>
 
@@ -226,7 +226,9 @@ Quill v1.7.x requires a C++14 compiler. Minimum required versions of supported c
 
 int main()
 {
-  quill::enable_console_colours();
+  quill::Config cfg;
+  cfg.enable_console_colours = true;
+  quill::configure(cfg);
   quill::start();
 
   quill::Logger* logger = quill::get_logger();
