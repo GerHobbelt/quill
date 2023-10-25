@@ -1,3 +1,4 @@
+- [v2.7.1](#v271)
 - [v2.7.0](#v270)
 - [v2.6.0](#v260)
 - [v2.5.1](#v251)
@@ -38,6 +39,16 @@
 - [v1.2.0](#v120)
 - [v1.1.0](#v110)
 - [v1.0.0](#v100)
+
+## v2.7.1
+
+**Fixes**
+
+- Fix the `Handlers` failing to find the file when the working directory of the application changes in
+  runtime. ([#247](https://github.com/odygrd/quill/pull/247))
+- When the given output directory of a log file passed to a `Handler` does not exist, it will now get automatically
+  created.
+- Support 'Windows 10 LTSB 2016, 1607 and Server 2016. ([#251](https://github.com/odygrd/quill/pull/251))
 
 ## v2.7.0
 
