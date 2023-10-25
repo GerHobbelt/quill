@@ -25,11 +25,12 @@ struct Config
   std::string backend_thread_name = "Quill_Backend";
 
   /**
-   * The backend thread will always "busy wait" spinning around every caller thread's local spsc queue.
-   * To reduce the OS scheduler priority when the backend worker thread is running on a shared cpu, they thread will attempt a periodic call to sleep().
-   * Each time the backend thread sees that there are no remaining logs to process in the queues it will sleep.
+   * The backend thread will always "busy wait" spinning around every caller thread's local
+   * spsc queue.
+   * This option can be enabled to reduce the OS scheduler priority when the backend worker thread
+   * is running on a shared cpu. The thread will yield when there is no remaining work to do.
    */
-  std::chrono::nanoseconds backend_thread_sleep_duration = std::chrono::nanoseconds{300};
+  bool backend_thread_yield = true;
 
   /**
    * The backend worker thread gives priority to reading the messages from SPSC queues from all
@@ -43,6 +44,15 @@ struct Config
    * continuing reading the SPSC queues
    */
   size_t backend_thread_max_transit_events = 800;
+
+  /**
+   * The backend worker thread pops all the SPSC queues log messages and buffers them to a local
+   * ring buffer queue as transit events. The transit_event_buffer is unbounded. The initial
+   * capacity of the buffer is customisable. Each newly spawned hot thread will have his own
+   * transit_event_buffer. This capacity is not in bytes but in items.
+   * It must be a power of two.
+   */
+  uint32_t backend_thread_initial_transit_event_buffer_capacity = 64;
 
   /**
    * The backend worker thread iterates all the active SPSC queues in order and pops all the messages
