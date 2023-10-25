@@ -1,28 +1,25 @@
-.. Quill documentation master file, created by
-sphinx-quickstart on Mon Jan 16 02:08:26 2023.
-You can adapt this file completely to your liking, but it should at least
-contain the root `toctree` directive.
+.. _index:
 
-Welcome to Quill's documentation!
-=================================
+##############################################################################
+Quill - Asynchronous Low Latency Logging Library for C++
+##############################################################################
+
+Quill is an open source, cross platform C++17 logging library designed for latency sensitive applications.
+
+`Github <http://github.com/odygrd/quill>`_
 
 .. toctree::
+   :hidden:
    :maxdepth: 2
-   :caption: Contents:
+   :caption: General Information
 
+   install
+   tutorial
+   usage
 
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: API
 
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-
-Docs
-====
-
-.. doxygenclass:: quill::Logger
-   :members:
-
-.. doxygenenum:: quill::LogLevel
+   users-api
