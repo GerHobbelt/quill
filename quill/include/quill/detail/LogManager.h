@@ -161,7 +161,7 @@ public:
     write_buffer = detail::align_pointer<alignof(detail::Header), std::byte>(write_buffer);
 
     new (write_buffer) detail::Header(
-      get_metadata_ptr<decltype(anonymous_log_message_info)>, logger_details,
+      detail::get_metadata_and_format_fn<decltype(anonymous_log_message_info)>, logger_details,
       (logger_details->timestamp_clock_type() == TimestampClockType::Rdtsc) ? quill::detail::rdtsc()
         : (logger_details->timestamp_clock_type() == TimestampClockType::System)
         ? static_cast<uint64_t>(std::chrono::system_clock::now().time_since_epoch().count())
@@ -256,7 +256,7 @@ private:
 private:
   Config _config;
   HandlerCollection _handler_collection;
-  ThreadContextCollection _thread_context_collection{};
+  ThreadContextCollection _thread_context_collection{_config};
   LoggerCollection _logger_collection{_config, _thread_context_collection, _handler_collection};
   BackendWorker _backend_worker{_config, _thread_context_collection, _handler_collection};
   std::once_flag _start_init_once_flag; /** flag to start the thread only once, in case start() is called multiple times */
