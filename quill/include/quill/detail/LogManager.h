@@ -132,7 +132,7 @@ public:
       return;
     }
 
-    // get the default logger - this is needed for the logger_details struct, in order to figure out
+    // get the root logger - this is needed for the logger_details struct, in order to figure out
     // the clock type later on the backend thread
     Logger* default_logger = logger_collection().get_logger(nullptr);
     LoggerDetails* logger_details = std::addressof(default_logger->_logger_details);
@@ -151,10 +151,9 @@ public:
     } anonymous_log_message_info;
 
     detail::ThreadContext* const thread_context = _thread_context_collection.local_thread_context();
-    uint32_t total_size = sizeof(detail::Header) + sizeof(uintptr_t);
+    size_t const total_size = sizeof(detail::Header) + sizeof(uintptr_t);
 
-    // request this size from the queue
-    std::byte* write_buffer = thread_context->spsc_queue().prepare_write(total_size);
+    std::byte* write_buffer = thread_context->spsc_queue().prepare_write(static_cast<uint32_t>(total_size));
     std::byte* const write_begin = write_buffer;
 
     write_buffer = detail::align_pointer<alignof(detail::Header), std::byte>(write_buffer);
@@ -166,7 +165,7 @@ public:
         ? static_cast<uint64_t>(std::chrono::system_clock::now().time_since_epoch().count())
         : default_logger->_custom_timestamp_clock->now());
 
-    write_buffer += sizeof(detail::Header);
+    write_buffer += static_cast<int32_t>(sizeof(detail::Header));
 
     // encode the pointer to atomic bool
     std::atomic<bool>* flush_ptr = std::addressof(backend_thread_flushed);
@@ -175,7 +174,9 @@ public:
 
     assert((write_buffer >= write_begin) &&
            "write_buffer should be greater or equal to write_begin");
-    thread_context->spsc_queue().commit_write(static_cast<size_t>(write_buffer - write_begin));
+
+    thread_context->spsc_queue().finish_write(static_cast<int32_t>(write_buffer - write_begin));
+    thread_context->spsc_queue().commit_write();
 
     // The caller thread keeps checking the flag until the backend thread flushes
     do
@@ -248,8 +249,8 @@ public:
 private:
   void _configure()
   {
-    // re-create the default logger with the given config
-    _logger_collection.create_default_logger();
+    // re-create the root logger with the given config
+    _logger_collection.create_root_logger();
   }
 
 private:

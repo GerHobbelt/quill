@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "quill/TweakMe.h"
+
 #include "quill/Fmt.h"
 #include "quill/detail/misc/Common.h"
 #include "quill/detail/misc/Os.h"
@@ -36,7 +38,7 @@ public:
   /**
    * Constructor
    */
-  explicit ThreadContext(size_t default_queue_capacity) : _spsc_queue(default_queue_capacity) {}
+  explicit ThreadContext(uint32_t default_queue_capacity) : _spsc_queue(default_queue_capacity) {}
 
   /**
    * Deleted
@@ -51,7 +53,7 @@ public:
    * @param i size of object
    * @return a pointer to the allocated object
    */
-  void* operator new(size_t i) { return aligned_alloc(CACHELINE_SIZE, i); }
+  void* operator new(size_t i) { return aligned_alloc(CACHE_LINE_ALIGNED, i); }
 
   /**
    * Operator delete
@@ -138,8 +140,7 @@ private:
   std::atomic<bool> _valid{true}; /**< is this context valid, set by the caller, read by the backend worker thread */
 
 #if defined(QUILL_USE_BOUNDED_QUEUE)
-  alignas(CACHELINE_SIZE) std::atomic<size_t> _dropped_message_counter{0};
-  char _pad0[detail::CACHELINE_SIZE - sizeof(std::atomic<size_t>)] = "\0";
+  alignas(CACHE_LINE_ALIGNED) std::atomic<size_t> _dropped_message_counter{0};
 #endif
 };
 } // namespace detail
