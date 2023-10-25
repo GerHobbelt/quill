@@ -475,8 +475,7 @@ void BackendWorker::_read_queue_messages_and_decode(ThreadContext* thread_contex
 
     // Finish reading
     assert((read_pos >= read_begin) && "read_buffer should be greater or equal to read_begin");
-    auto const read_size = static_cast<int32_t>(read_pos - read_begin);
-    queue.finish_read(read_size);
+    queue.finish_read(static_cast<uint32_t>(read_pos - read_begin));
 
     read_one = true;
     _transit_events.emplace(transit_event->header.timestamp, transit_event);
@@ -497,7 +496,8 @@ void BackendWorker::_process_transit_event()
 {
   TransitEvent* transit_event = _transit_events.top().second;
 
-  auto const [macro_metadata, format_to_fn] = transit_event->header.metadata_and_format_fn();
+  std::pair<MacroMetadata, detail::FormatToFn> const mf = transit_event->header.metadata_and_format_fn();
+  MacroMetadata const& macro_metadata = mf.first;
 
   // If backend_process(...) throws we want to skip this event and move to the next, so we catch the
   // error here instead of catching it in the parent try/catch block of main_loop
@@ -589,7 +589,8 @@ void BackendWorker::_process_transit_event()
 void BackendWorker::_write_transit_event(TransitEvent const& transit_event)
 {
   // Forward the record to all the logger handlers
-  auto const [macro_metadata, format_to_fn] = transit_event.header.metadata_and_format_fn();
+  std::pair<MacroMetadata, detail::FormatToFn> const mf = transit_event.header.metadata_and_format_fn();
+  MacroMetadata const& macro_metadata = mf.first;
 
   for (auto& handler : transit_event.header.logger_details->handlers())
   {
