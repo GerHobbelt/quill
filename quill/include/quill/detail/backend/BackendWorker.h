@@ -323,10 +323,11 @@ void BackendWorker::_read_queue_messages_and_decode(ThreadContext* thread_contex
   // The producer will add items to the buffer :
   // |timestamp|metadata*|logger_details*|args...|
 
-  bool read_one{false};
   std::byte* read_pos = queue.prepare_read();
+  uint32_t total_bytes_read{0};
 
-  while (read_pos)
+  // read max of a full queue otherwise we can get stuck here forever
+  while (read_pos && (total_bytes_read < queue.capacity()))
   {
     std::byte* const read_begin = read_pos;
 
@@ -476,17 +477,17 @@ void BackendWorker::_read_queue_messages_and_decode(ThreadContext* thread_contex
     // Finish reading
     assert((read_pos >= read_begin) && "read_buffer should be greater or equal to read_begin");
     queue.finish_read(static_cast<uint32_t>(read_pos - read_begin));
+    total_bytes_read += static_cast<uint32_t>(read_pos - read_begin);
 
-    read_one = true;
     _transit_events.emplace(transit_event->header.timestamp, transit_event);
 
     // read again
     read_pos = queue.prepare_read();
   }
 
-  if (read_one)
+  if (total_bytes_read != 0)
   {
-    // read everything the queue of this thread should be empty
+    // we read something from the queue, we commit all the reads together at the end
     queue.commit_read();
   }
 }
