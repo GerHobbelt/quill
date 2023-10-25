@@ -1,3 +1,5 @@
+- [v2.6.1](#v2.6.1)
+- [v2.6.0](#v2.6.0)
 - [v2.6.0](#v2.6.0)
 - [v2.5.1](#v2.5.1)
 - [v2.5.0](#v2.5.0)
@@ -37,6 +39,15 @@
 - [v1.2.0](#v1.2.0)
 - [v1.1.0](#v1.1.0)
 - [v1.0.0](#v1.0.0)
+
+## v2.6.1
+
+**Fixes**
+
+- Remove references to build directory path from the compiled library's
+  symbols ([#221](https://github.com/odygrd/quill/pull/221))
+- Fix when compiled as shared library with hiden visibility ([#222](https://github.com/odygrd/quill/pull/222))
+- Fix equal timestamp log messages appearing out of order ([#223](https://github.com/odygrd/quill/pull/223))
 
 ## v2.6.0
 

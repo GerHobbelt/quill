@@ -146,8 +146,7 @@ public:
       constexpr quill::MacroMetadata operator()() const noexcept
       {
         return quill::MacroMetadata{
-          QUILL_STRINGIFY(__LINE__),          __FILE__, __FUNCTION__, "", LogLevel::Critical,
-          quill::MacroMetadata::Event::Flush, false};
+          "", "", "", "", LogLevel::Critical, quill::MacroMetadata::Event::Flush, false};
       }
     } anonymous_log_message_info;
 
@@ -275,7 +274,7 @@ public:
    * Access to singleton instance
    * @return a reference to the singleton
    */
-  static LogManagerSingleton& instance() noexcept
+  QUILL_EXPORT static LogManagerSingleton& instance() noexcept
   {
     static LogManagerSingleton instance;
     return instance;
