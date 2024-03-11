@@ -28,26 +28,14 @@ namespace quill::detail
  * The backend thread reads all existing ThreadContext class instances and pop the events
  * from each thread queue
  */
-class ThreadContext
+class alignas(CACHE_LINE_ALIGNED) ThreadContext
 {
 public:
   /**
    * Constructor
    */
-  explicit ThreadContext(QueueType queue_type, uint32_t default_queue_capacity,
-                         uint32_t initial_transit_event_buffer_capacity, bool huge_pages)
-    : _transit_event_buffer(initial_transit_event_buffer_capacity)
-  {
-    if ((queue_type == QueueType::UnboundedBlocking) ||
-        (queue_type == QueueType::UnboundedNoMaxLimit) || (queue_type == QueueType::UnboundedDropping))
-    {
-      _spsc_queue.emplace<UnboundedQueue>(default_queue_capacity, huge_pages);
-    }
-    else
-    {
-      _spsc_queue.emplace<BoundedQueue>(default_queue_capacity, huge_pages);
-    }
-  }
+  ThreadContext(QueueType queue_type, uint32_t default_queue_capacity,
+                uint32_t initial_transit_event_buffer_capacity, bool huge_pages);
 
   /**
    * Deleted
@@ -56,25 +44,9 @@ public:
   ThreadContext& operator=(ThreadContext const&) = delete;
 
   /**
-   * Operator new to align this object to a cache line boundary as we always create it on the heap
-   * This object should always be aligned to a cache line as it contains the SPSC queue as a member
-   * which has cache line alignment requirements
-   * @param i size of object
-   * @return a pointer to the allocated object
-   */
-  void* operator new(size_t i) { return alloc_aligned(i, CACHE_LINE_ALIGNED); }
-
-  /**
-   * Operator delete
-   * @see operator new
-   * @param p pointer to object
-   */
-  void operator delete(void* p) { free_aligned(p); }
-
-  /**
    * @return A reference to the backend's thread transit event buffer
    */
-  QUILL_NODISCARD_ALWAYS_INLINE_HOT detail::UnboundedTransitEventBuffer& transit_event_buffer() noexcept
+  QUILL_NODISCARD_ALWAYS_INLINE_HOT UnboundedTransitEventBuffer& transit_event_buffer() noexcept
   {
     return _transit_event_buffer;
   }
@@ -164,14 +136,7 @@ public:
    * counter Called by the backend worker thread
    * @return current value of the message message counter
    */
-  QUILL_NODISCARD QUILL_ATTRIBUTE_HOT size_t get_and_reset_message_failure_counter() noexcept
-  {
-    if (QUILL_LIKELY(_message_failure_counter.load(std::memory_order_relaxed) == 0))
-    {
-      return 0;
-    }
-    return _message_failure_counter.exchange(0, std::memory_order_relaxed);
-  }
+  QUILL_NODISCARD QUILL_ATTRIBUTE_HOT size_t get_and_reset_message_failure_counter() noexcept;
 
 private:
   std::variant<std::monostate, UnboundedQueue, BoundedQueue> _spsc_queue; /** queue for this thread, events are pushed here */
