@@ -1,3 +1,4 @@
+- [v3.4.1](#v341)
 - [v3.4.0](#v340)
 - [v3.3.1](#v331)
 - [v3.3.0](#v330)
@@ -50,6 +51,13 @@
 - [v1.2.0](#v120)
 - [v1.1.0](#v110)
 - [v1.0.0](#v100)
+
+## v3.4.1
+
+- Reduce backend worker unnecessary allocation. ([#368](https://github.com/odygrd/quill/issues/368))
+- Adjusted handling for empty `std::string_view` instances, addressing an issue where logging empty strings triggered an
+  unintended `memcpy` with zero size and a nullptr, leading to address sanitizer warnings.
+- Fix clang build error when using `-DQUILL_NO_EXCEPTIONS:BOOL=ON`. ([#357](https://github.com/odygrd/quill/issues/357))
 
 ## v3.4.0
 
