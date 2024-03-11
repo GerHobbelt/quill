@@ -1,3 +1,12 @@
+- [v3.4.0](#v340)
+- [v3.3.1](#v331)
+- [v3.3.0](#v330)
+- [v3.2.0](#v320)
+- [v3.1.0](#v310)
+- [v3.0.2](#v302)
+- [v3.0.1](#v301)
+- [v3.0.0](#v300)
+- [v2.9.2](#v292)
 - [v2.9.1](#v291)
 - [v2.9.0](#v290)
 - [v2.8.0](#v280)
@@ -42,10 +51,306 @@
 - [v1.1.0](#v110)
 - [v1.0.0](#v100)
 
+## v3.4.0
+
+- Resolved `bad_variant_access` error occurring when using Quill as a pre-compiled library with a distinct queue
+  type. ([#276](https://github.com/odygrd/quill/pull/276))
+
+- Resolved a bug in `RotatingFileHandler` associated with logfiles located outside the working directory,
+  specifically when used with open_mode `a`. ([#340](https://github.com/odygrd/quill/pull/340))
+
+- Added a `name()` method to the Logger class which provides the logger
+  name. ([#345](https://github.com/odygrd/quill/pull/345))
+
+- Fixed library and include paths in the pkg-config configuration. ([#352](https://github.com/odygrd/quill/pull/352))
+
+- Move `get_root_logger()` definition from cpp to the header file ([#348](https://github.com/odygrd/quill/issues/348))
+
+- Introduced support for logging character arrays. You can now log character arrays, even when they don't contain a
+  null-terminating character.
+  Additionally, character arrays with null characters in the middle are supported, and the logger will
+  capture the content until the null character is encountered. ([#353](https://github.com/odygrd/quill/pull/353))
+
+  For example
+
+  ```c++
+      union
+    {
+      char no_0[2];
+      char mid_0[6]{'1', '2', '3', '4', '\0', 6};
+    } char_arrays;
+
+    // only output "12" even if there's no '\0' at the end
+    LOG_INFO(logger, R"(This is a log info example for char array without '\0': {})", char_arrays.no_0);
+
+    // output "1234" until the '\0'
+    LOG_INFO(logger, R"(This is a log info example for char array with '\0' in middle: {})",
+             char_arrays.mid_0);
+  ```
+
+- Minor improvements in the bounded queue and throughput. ([#362](https://github.com/odygrd/quill/pull/362))
+
+  Previous: 2.21 million msgs/sec average, total time elapsed: 1809 ms for 4000000 log messages.
+
+  New:      2.24 million msgs/sec average, total time elapsed: 1787 ms for 4000000 log messages.
+
+- Disable `fmt::join(data, "")` at compile time. ([#356](https://github.com/odygrd/quill/issues/356))
+- Fix compile error in Apple Clang 12. ([#360](https://github.com/odygrd/quill/issues/360))
+- Add guards for redefined preprocessor variables.
+- Fix `uint64_t` to `time_t` implicit conversion error in Clang 18.
+- Update bundled `libfmt` to `v10.1.1`
+
+## v3.3.1
+
+- Fixed `RotatingFileHandler` to prevent accidental removal of non-log files when using open mode `w`
+  and `set_remove_old_files(true)`
+
+## v3.3.0
+
+- Added a `quill::get_handler(handler_name)` function that allows easy lookup of an existing `Handler` by name. This
+  function proves helpful when you want to retrieve a handler and pass it to a new logger.
+
+- Fix build failure of Intel Compiler Classic. ([#332](https://github.com/odygrd/quill/pull/332))
+
+- Introduced `QUILL_BLOCKING_QUEUE_RETRY_INTERVAL_NS` option for user-configurable retry interval in the blocking queue.
+  Default value is 800 nanoseconds. ([#330](https://github.com/odygrd/quill/pull/330))
+
+- Improved backend thread handling. Now verifies that all producer SPSC queues are empty before entering `sleep`.
+
+- Fixed a race condition and potential crash in `quill::remove_logger(Logger*)` when called without prior `quill::flush()`.
+
+- Added protection to prevent removal of the root logger with `quill::remove_logger(Logger*)`.
+
+- Improved exception handling on the backend thread when calling `fmt::format()`.
+
+  While compile-time checks ensure that the format string and arguments match, runtime errors can still occur.
+  Previously, such exceptions would affect and drop subsequent log records. Now, exceptions are caught and logged
+  in the log file and reported via the backend thread notification handler (default is `cerr`).
+
+  For example, if a dynamic precision is used (`LOG_INFO(logger, "Support for floats {:.{}f}", 1.23456, 3.321312)`),
+  the log file will show the following error message:
+
+  ```
+  LOG_INFO root [format: "Support for floats {:.{}f}", error: "precision is not integer"]
+  ```
+
+  Additionally, an error message will be printed to `cerr`
+
+  ```
+  Quill ERROR: [format: "Support for floats {:.{}f}", error: "precision is not integer"]
+  ```
+
+- Fixed a bug in timestamp formatting that occasionally displayed an hour component of 0 as
+  24. ([#329](https://github.com/odygrd/quill/pull/329))
+
+- Added support for specifying a runtime log level, allowing dynamic log level configuration at runtime.
+  The new runtime log level feature provides flexibility when needed, with a minor overhead cost.
+  It is recommended to continue using the existing static log level macros for optimal
+  performance. ([#321](https://github.com/odygrd/quill/pull/321))
+
+  For example
+
+  ```c++
+    std::array<quill::LogLevel, 4> const runtime_log_levels = {quill::LogLevel::Debug,
+                                                               quill::LogLevel::Info,
+                                                               quill::LogLevel::Warning,
+                                                               quill::LogLevel::Error};
+  
+    for (auto const& log_level : runtime_log_levels)
+    {
+      LOG_DYNAMIC(logger, log_level, "Runtime {} {}", "log", "level");
+    }
+  ```
+
+- Added support for printf-style formatting with `_CFORMAT` macros. These macros use the `printf` format string syntax,
+  simplifying the migration of legacy codebases using `printf` statements.
+
+  For example
+
+  ```c++
+    std::array<uint32_t, 4> arr = {1, 2, 3, 4};
+    LOG_INFO(logger, "This is a log info example using fmt format {}", arr);
+    
+    LOG_INFO_CFORMAT(logger, "printf style %s supported %d %f", "also", 5, 2.32);
+  ```
+
+- Added a `metadata()` member function to the `TransitEvent` class. It provides access to the `Metadata` object
+  associated with the log record, simplifying syntax for retrieving log record metadata in custom Handlers.
+
+  For example
+
+  ```c++
+  void CustomHandler::write(fmt_buffer_t const& formatted_log_message, quill::TransitEvent const& log_event)
+  {
+    MacroMetadata const macro_metadata = log_event.metadata();
+  }
+  ```
+
+- Simplified file handler configuration. Now, instead of passing multiple arguments to the constructor,
+  you only need to provide a single `FileHandlerConfig` object. This change makes creating file handlers objects
+  much easier and more flexible.
+
+  For example
+
+  ```c++
+  quill::FileHandlerConfig file_handler_cfg;
+  file_handler_cfg.set_open_mode('w');
+  file_handler_cfg.set_append_to_filename(quill::FilenameAppend::StartDateTime);
+  
+  std::shared_ptr<quill::Handler> file_handler = quill::file_handler("application.log", file_handler_cfg);
+  quill::Logger* logger_foo = quill::create_logger("my_logger", std::move(file_handler));
+  
+  LOG_INFO(my_logger, "Hello from {}", "application");
+  ```
+
+- Combined the functionalities of `RotatingFileHandler` (rotating based on file size) and `TimeRotatingFileHandler`
+  (rotating on a time interval) into a single, more versatile `RotatingFileHandler`. Users can now conveniently rotate
+  logs based on both file size and time intervals simultaneously. The updated `RotatingFileHandler` offers a variety of
+  customization options for improved flexibility. For more information on available configurations,
+  refer to the `RotatingFileHandlerConfig` documentation.
+
+  For example
+
+  ```c++
+    // Create a rotating file handler which rotates daily at 18:30 or when the file size reaches 2GB
+  std::shared_ptr<quill::Handler> file_handler =
+    quill::rotating_file_handler(filename,
+                                 []()
+                                 {
+                                   quill::RotatingFileHandlerConfig cfg;
+                                   cfg.set_rotation_time_daily("18:30");
+                                   cfg.set_rotation_max_file_size(2'000'000'000);
+                                   return cfg;
+                                 }());
+
+  // Create a logger using this handler
+  quill::Logger* logger_bar = quill::create_logger("daily_logger", std::move(file_handler));
+  ```
+
+- Improved compatibility with older versions of external `libfmt`. Quill now compiles for all versions
+  of `libfmt >= 8.0.0`.
+
+## v3.2.0
+
+- Addition of std::is_trivially_copyable<T> to default copy loggable
+  types. ([#318](https://github.com/odygrd/quill/pull/318))
+- By default, the static library now builds with '-fPIC' to generate position-independent code.
+  To disable this feature, you can use the CMake option 'QUILL_DISABLE_POSITION_INDEPENDENT_CODE'.
+- The `LOG_<LEVEL>_LIMIT` macros now support using `std::chrono` duration types for specifying the log interval.
+  Instead of providing a raw number, you can use:
+
+  ```c++
+      LOG_INFO_LIMIT(std::chrono::milliseconds {100} , quill::get_logger(), "log message");
+  ```
+
+## v3.1.0
+
+- It is now possible to set a minimum logging interval for specific logs. For example:
+
+  ```c++
+    for (uint64_t i = 0; i < 10; ++i)
+    {
+      LOG_INFO_LIMIT(2000, default_logger, "log in a loop with limit 1 message every 2000 micros for i {}", i);
+      std::this_thread::sleep_for(std::chrono::microseconds{1000});
+    }
+  ```
+
+- `quill::utility::to_string()` now uses `fmt::to_string()`
+
+- Quill now utilizes a custom namespace (`fmtquill`) for the bundled fmt library. This enables smooth integration with
+  your own external fmt library, even if it's a different version.
+
+## v3.0.2
+
+- Add missing header on clang when `QUILL_X86ARCH` is defined.
+
+## v3.0.1
+
+- Enhanced the reported message for reallocation of the unbounded queue to include the thread id.
+
+## v3.0.0
+
+- The previous unbounded queue constantly reallocated memory, risking system memory exhaustion, especially when handling
+  intensive logging from multiple threads. Starting from `v3.0.0`, the default behavior has been improved to limit
+  the queue capacity to 2 GB. When this limit is reached, the queue blocks the hot thread instead of further
+  reallocation.
+  To modify the default behavior, there is no need to recompile the `quill` library. Recompile your application
+  with one of the following header-only flags.
+
+  ```shell
+  # Previous behavior in v2.*.*: Reallocates new queues indefinitely when max capacity is reached
+  -DCMAKE_CXX_FLAGS:STRING="-DQUILL_USE_UNBOUNDED_NO_MAX_LIMIT_QUEUE"
+  
+  # Default behavior in v3.*.*: Starts small, reallocates up to 2GB, then hot thread blocks
+  -DCMAKE_CXX_FLAGS:STRING="-DQUILL_USE_UNBOUNDED_BLOCKING_QUEUE"
+  
+  # Starts small, reallocates up to 2GB, then hot thread drops log messages
+  -DCMAKE_CXX_FLAGS:STRING="-DQUILL_USE_UNBOUNDED_DROPPING_QUEUE"
+  
+  # Fixed queue size, no reallocations, hot thread drops log messages
+  -DCMAKE_CXX_FLAGS:STRING="-DQUILL_USE_BOUNDED_QUEUE"         
+  
+  # Fixed queue size, no reallocations, hot thread blocks
+  -DCMAKE_CXX_FLAGS:STRING="-DQUILL_USE_BOUNDED_BLOCKING_QUEUE"
+  ```
+
+- Added support for huge pages on Linux. Enabling this feature allows bounded or unbounded queues to utilize huge pages,
+  resulting in optimized memory allocation.
+
+  ```c++
+    quill::Config cfg;
+    cfg.enable_huge_pages_hot_path = true;
+    
+    quill::configure(cfg);
+    quill::start();
+  ```
+
+- Added support for logging `std::optional`, which is also now supported in `libfmt` `v10.0.0`.
+
+  ```c++
+    LOG_INFO(default_logger, "some optionals [{}, {}]", std::optional<std::string>{},
+             std::optional<std::string>{"hello"});
+  ```
+
+- Introduced a new function `run_loop` in the `Handler` base class, which allows users to override and execute periodic
+  tasks. This enhancement provides users with the flexibility to perform various actions at regular intervals,
+  such as batch committing data to a database.
+- In scenarios where a hot thread is blocked and unable to push messages to the queue in blocking mode, this situation
+  will now be reported through the `backend_thread_notifications_handler` to the standard error stream `cerr`.
+
+## v2.9.2
+
+- Fix increased compile times due to `x86intrin` headers. ([#298](https://github.com/odygrd/quill/pull/298))
+- Fix compile error when using `QUILL_X86ARCH` on windows.
+- Fix bugs when quill is build as a shared library on windows. ([#302](https://github.com/odygrd/quill/pull/302))
+
 ## v2.9.1
 
 - Removed `CMAKE_INSTALL_RPATH` from cmake. ([#284](https://github.com/odygrd/quill/pull/284))
 - Fix compile warning on Apple M1. ([#291](https://github.com/odygrd/quill/pull/291))
+- Update bundled `libfmt` to `v10.0.0`
+- Fix for `CMAKE_MODULE_PATH` ([#295](https://github.com/odygrd/quill/pull/295))
+- Fixed a bug in `TimeRotatingFileHandler` when `quill::FilenameAppend::None` is
+  used. ([#296](https://github.com/odygrd/quill/pull/296))
+- Fixed `TimeRotatingFileHandler` and `RotatingFileHandler` to work when `/dev/null` is used as a
+  filename ([#297](https://github.com/odygrd/quill/pull/297))
+- Added `NullHandler` that can be used to discard the logs. For example:
+
+  ```c++
+  int main()
+  {
+    quill::start();
+    
+    std::shared_ptr<quill::Handler> file_handler =
+      quill::null_handler();
+  
+    quill::Logger* logger_bar = quill::create_logger("nullhandler", std::move(file_handler));
+  
+    for (uint32_t i = 0; i < 150; ++i)
+    {
+      LOG_INFO(logger_bar, "Hello");
+    }
+  ```
 
 ## v2.9.0
 
@@ -56,8 +361,7 @@
 **Improvements**
 
 - Renamed `backend_thread_error_handler` to `backend_thread_notifications_handler` in `Config.h`. Previously this
-  handler was
-  used only to report errors from the backend worker thread to the user. This callback will also now report
+  handler was used only to report errors from the backend worker thread to the user. This callback will also now report
   info messages to the user.
 - Report unbounded spsc queue reallocation via
   the `backend_thread_notifications_handler`. ([#286](https://github.com/odygrd/quill/pull/286))
@@ -128,8 +432,10 @@
 - Reduce padding in some structs.
 - Fix 'rename_file' throwing an exception while being marked
   as `noexcept`. ([#230](https://github.com/odygrd/quill/pull/230))
-- Fix crash with `std::bad_alloc` and compiler warnings in gcc `7.3.1`. ([#235](https://github.com/odygrd/quill/pull/235))
-- The additional compiler definitions will now be propagated to the parent targets when enabling options in CMake. ([#235](https://github.com/odygrd/quill/pull/235))
+- Fix crash with `std::bad_alloc` and compiler warnings in
+  gcc `7.3.1`. ([#235](https://github.com/odygrd/quill/pull/235))
+- The additional compiler definitions will now be propagated to the parent targets when enabling options in
+  CMake. ([#235](https://github.com/odygrd/quill/pull/235))
 
 **Improvements**
 

@@ -43,15 +43,17 @@ public:
 
   /**
    * Set a custom formatter for this handler
-   * @param format_pattern format pattern see PatternFormatter
-   * @param timestamp_format defaults to "%H:%M:%S.%Qns"
+   * @warning This function is not thread safe and should be called before any logging to this handler happens
+   * Prefer to set the formatter in the constructor when possible via the FileHandlerConfig
+   * @param log_pattern format pattern see PatternFormatter
+   * @param time_format defaults to "%H:%M:%S.%Qns"
    * @param timezone defaults to PatternFormatter::Timezone::LocalTime
    */
   QUILL_ATTRIBUTE_COLD void set_pattern(
-    std::string const& format_pattern, std::string const& timestamp_format = std::string{"%H:%M:%S.%Qns"},
+    std::string const& log_pattern, std::string const& time_format = std::string{"%H:%M:%S.%Qns"},
     Timezone timezone = Timezone::LocalTime)
   {
-    _formatter = std::make_unique<PatternFormatter>(format_pattern, timestamp_format, timezone);
+    _formatter = std::make_unique<PatternFormatter>(log_pattern, time_format, timezone);
   }
 
   /**
@@ -74,6 +76,16 @@ public:
    * Flush the handler synchronising the associated handler with its controlled output sequence.
    */
   QUILL_ATTRIBUTE_HOT virtual void flush() noexcept = 0;
+
+  /**
+   * Executes periodically by the backend thread, providing an opportunity for the user
+   * to perform custom tasks. For example, batch committing to a database, or any other
+   * desired periodic operations.
+   *
+   * @note It is recommended to avoid performing heavy operations within this function
+   *       as it may adversely affect the performance of the backend thread.
+   */
+  QUILL_ATTRIBUTE_HOT virtual void run_loop() noexcept {};
 
   /**
    * Sets a log level filter on the handler. Log statements with higher or equal severity only will be logged
@@ -108,7 +120,8 @@ public:
    * @return result of all filters
    */
   QUILL_NODISCARD bool apply_filters(char const* thread_id, std::chrono::nanoseconds log_message_timestamp,
-                                     MacroMetadata const& metadata, fmt_buffer_t const& formatted_record);
+                                     LogLevel log_level, MacroMetadata const& metadata,
+                                     fmt_buffer_t const& formatted_record);
 
 protected:
   /**< Owned formatter for this handler, we have to use a pointer here since the PatterFormatter

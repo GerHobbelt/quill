@@ -27,7 +27,7 @@ public:
     // Called by the logger backend worker thread
     // This is not called for each LOG_* invocation like the write function, instead it is called
     // periodically or when there are no more LOG_* writes left to process.
-    std::cout << fmt::format("VectorHandler: {}", _formatted_messages) << std::endl;
+    std::cout << fmtquill::format("VectorHandler: {}", _formatted_messages) << std::endl;
   }
 
 private:
@@ -40,7 +40,13 @@ int main()
   quill::start();
 
   // Get a handler to the file
-  std::shared_ptr<quill::Handler> file_handler = quill::file_handler("app.log", "w");
+  std::shared_ptr<quill::Handler> file_handler = quill::file_handler("app.log",
+                                                                     []()
+                                                                     {
+                                                                       quill::FileHandlerConfig cfg;
+                                                                       cfg.set_open_mode('w');
+                                                                       return cfg;
+                                                                     }());
 
   // Get the handler to console
   std::shared_ptr<quill::Handler> console_handler = quill::stdout_handler();
@@ -59,5 +65,4 @@ int main()
 
   LOG_INFO(logger_foo, "Hello from {}", "quill");
   LOG_DEBUG(logger_foo, "Multiple handlers {}", "example");
-
 }

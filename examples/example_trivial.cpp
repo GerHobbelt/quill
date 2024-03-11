@@ -1,5 +1,8 @@
 #include "quill/Quill.h"
 
+#include <chrono>
+#include <thread>
+
 /**
  * Trivial logging example
  */
@@ -38,6 +41,31 @@ int main()
 
     std::array<uint32_t, 4> arr = {1, 2, 3, 4};
     LOG_INFO(logger, "This is a log info example {}", arr);
+
+    union
+    {
+      char no_0[2];
+      char mid_0[6]{'1', '2', '3', '4', '\0', 6};
+    } char_arrays;
+
+    // only output "12" even if there's no '\0' at the end
+    LOG_INFO(logger, R"(This is a log info example for char array without '\0': {})", char_arrays.no_0);
+
+    // output "1234" until the '\0'
+    LOG_INFO(logger, R"(This is a log info example for char array with '\0' in middle: {})",
+             char_arrays.mid_0);
+
+    // Using a dynamic runtime log level
+    std::array<quill::LogLevel, 4> const runtime_log_levels = {
+      quill::LogLevel::Debug, quill::LogLevel::Info, quill::LogLevel::Warning, quill::LogLevel::Error};
+
+    for (auto const& log_level : runtime_log_levels)
+    {
+      LOG_DYNAMIC(logger, log_level, "Runtime {} {}", "log", "level");
+    }
+
+    // printf format style is also supported
+    LOG_INFO_CFORMAT(logger, "printf style %s %d %f", "example", 5, 2.31);
   }
 
   // b) Or like this
@@ -66,6 +94,12 @@ int main()
 
   LOG_INFO(default_logger, "Welcome to Quill!");
   LOG_INFO(default_logger, "Print a vector {} ", std::vector<int>{1, 2, 3, 4, 5});
+
+#if QUILL_FMT_VERSION >= 100000
+  LOG_INFO(default_logger, "or some optionals [{}, {}]", std::optional<std::string>{},
+           std::optional<std::string>{"hello"});
+#endif
+
   LOG_ERROR(default_logger, "An error message with error code {}, error message {}", 123,
             "system_error");
 
@@ -97,4 +131,13 @@ int main()
   }
 
   LOG_INFO(default_logger, "Existing logger names {}", logger_names);
+
+  for (uint64_t i = 0; i < 10; ++i)
+  {
+    LOG_INFO_LIMIT(std::chrono::milliseconds{100}, default_logger,
+                   "log in a loop with limit 1 message every 100 ms for i {}", i);
+    LOG_DEBUG_LIMIT(std::chrono::seconds{1}, default_logger,
+                    "log in a loop with limit 1 message every 1 second for i {}", i);
+    std::this_thread::sleep_for(std::chrono::microseconds{30});
+  }
 }

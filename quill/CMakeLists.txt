@@ -41,9 +41,9 @@ set(HEADER_FILES
         include/quill/handlers/FileHandler.h
         include/quill/handlers/Handler.h
         include/quill/handlers/JsonFileHandler.h
+        include/quill/handlers/NullHandler.h
         include/quill/handlers/RotatingFileHandler.h
         include/quill/handlers/StreamHandler.h
-        include/quill/handlers/TimeRotatingFileHandler.h
 
         include/quill/Config.h
         include/quill/Fmt.h
@@ -80,7 +80,6 @@ set(SOURCE_FILES
         src/handlers/JsonFileHandler.cpp
         src/handlers/RotatingFileHandler.cpp
         src/handlers/StreamHandler.cpp
-        src/handlers/TimeRotatingFileHandler.cpp
 
         src/LogLevel.cpp
         src/PatternFormatter.cpp
@@ -110,17 +109,23 @@ if (NOT QUILL_FMT_EXTERNAL)
             src/bundled/fmt/os.cc)
 endif ()
 
-if (BUILD_SHARED_LIBS)
-    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-endif ()
-
 # Add as a library
 add_library(${TARGET_NAME} "")
 add_library(${TARGET_NAME}::${TARGET_NAME} ALIAS ${TARGET_NAME})
 
 if (BUILD_SHARED_LIBS)
-    set_property(TARGET ${TARGET_NAME} PROPERTY CXX_VISIBILITY_PRESET default)
-    set_property(TARGET ${TARGET_NAME} PROPERTY VISIBILITY_INLINES_HIDDEN OFF)
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+    target_compile_definitions(${TARGET_NAME} PRIVATE QUILL_DLL_EXPORT INTERFACE QUILL_BUILD_SHARED)
+    set_target_properties(${TARGET_NAME} PROPERTIES CXX_VISIBILITY_PRESET default
+            VISIBILITY_INLINES_HIDDEN OFF
+            POSITION_INDEPENDENT_CODE TRUE)
+else ()
+    # static library
+    if (QUILL_DISABLE_POSITION_INDEPENDENT_CODE)
+        set_target_properties(${TARGET_NAME} PROPERTIES POSITION_INDEPENDENT_CODE FALSE)
+    else ()
+        set_target_properties(${TARGET_NAME} PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+    endif ()
 endif ()
 
 if (QUILL_NO_EXCEPTIONS)
@@ -158,10 +163,10 @@ else ()
     set(PKG_CONFIG_REQUIRES fmt)
 endif ()
 
-if(MINGW)
+if (MINGW)
     # strftime requires this when using MinGw to correctly format the time ..
     target_link_libraries(${TARGET_NAME} PUBLIC ucrtbase)
-endif()
+endif ()
 
 if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
     target_link_libraries(${TARGET_NAME} PUBLIC stdc++fs)
@@ -179,10 +184,14 @@ target_include_directories(${TARGET_NAME}
 target_compile_options(${TARGET_NAME} PRIVATE
         $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
         -Wall -Wextra -Wconversion -pedantic -Wfatal-errors -Wno-unused-private-field -Wno-gnu-zero-variadic-macro-arguments -Wno-unused-parameter>
-        $<$<CXX_COMPILER_ID:MSVC>:/W4 /wd4324 /wd4189 /wd4996 /wd4100>)
+        $<$<CXX_COMPILER_ID:MSVC>:/W4 /wd4324 /wd4189 /wd4996 /wd4100 /wd4127 /wd4702>)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    target_compile_options(${TARGET_NAME} PRIVATE /WX /EHsc)
+    if (NOT QUILL_NO_EXCEPTIONS)
+        target_compile_options(${TARGET_NAME} PUBLIC /EHsc)
+    endif ()
+
+    target_compile_options(${TARGET_NAME} PRIVATE /WX)
     target_compile_definitions(${TARGET_NAME} PRIVATE _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING)
 endif ()
 
@@ -247,6 +256,20 @@ if (QUILL_MASTER_PROJECT OR QUILL_ENABLE_INSTALL)
     # Export the library
     install(EXPORT ${targets_export_name} DESTINATION ${QUILL_CMAKE_DIR}
             NAMESPACE quill::)
+
+    # Install the examples
+    if (QUILL_BUILD_EXAMPLES)
+        install(TARGETS quill_example_backtrace quill_example_configure_backend quill_example_console_colours
+                quill_example_console_colours_with_custom_formatter quill_example_custom_clock quill_example_custom_clock_advanced
+                quill_example_custom_console_colours quill_example_trivial quill_example_logging_to_file quill_example_multiple_handlers
+                quill_example_quick_start quill_example_signal_handler quill_example_stdout_multiple_formatters quill_example_custom_formatter
+                quill_example_custom_formatter_thread_name quill_example_custom_handler quill_example_daily_file_rotation
+                quill_example_file_rotation quill_example_filters quill_example_handler_log_levels quill_example_json_structured_log
+                quill_example_trivial_system_clock quill_example_trivial_file_logging quill_example_user_defined_types
+                quill_example_bounded_queue_message_dropping quill_example_bounded_queue_blocking quill_example_file_callbacks
+                quill_example_wake_up_logging_thread
+                RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif ()
 
     # Copy the headers
     if (QUILL_FMT_EXTERNAL)

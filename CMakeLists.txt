@@ -9,6 +9,8 @@ option(QUILL_FMT_EXTERNAL "Use external fmt library instead of bundled" OFF)
 
 option(QUILL_NO_EXCEPTIONS "Build without exceptions with -fno-exceptions flag" OFF)
 
+option(QUILL_DISABLE_POSITION_INDEPENDENT_CODE "Disable position-independent code" OFF)
+
 option(QUILL_BUILD_EXAMPLES "Build the examples" OFF)
 
 option(QUILL_BUILD_TESTS "Build the tests (Requires https://github.com/google/googletest to be installed)" OFF)
@@ -45,7 +47,7 @@ endif ()
 #-------------------------------------------------------------------------------------------------------
 # Custom cmake functions
 #-------------------------------------------------------------------------------------------------------
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/quill/cmake" CACHE STRING "Modules for CMake" FORCE)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/quill/cmake")
 include(Utility)
 
 #-------------------------------------------------------------------------------------------------------

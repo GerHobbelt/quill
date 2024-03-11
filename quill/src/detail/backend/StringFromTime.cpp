@@ -136,13 +136,12 @@ std::string const& StringFromTime::format_timestamp(time_t timestamp)
     _pre_formatted_ts.clear();
     _cached_indexes.clear();
 
-    // Now populate a pre formatted string for the next rec
+    // Now populate a pre-formatted string for the next rec
     _populate_pre_formatted_string_and_cached_indexes(timestamp);
 
     if (_time_zone == Timezone::LocalTime)
     {
-      // Update the timestamp to point to the next hour, here we can just add 3600 as the _next_hour_timestamp was already rounded to point to sharp minutes before
-      _next_recalculation_timestamp = timestamp + 3600;
+      _next_recalculation_timestamp = next_hour_timestamp(timestamp);
     }
     else if (_time_zone == Timezone::GmtTime)
     {
@@ -277,16 +276,11 @@ std::string const& StringFromTime::format_timestamp(time_t timestamp)
 /***/
 void StringFromTime::_populate_initial_parts(std::string timestamp_format)
 {
-  std::string part1;
-  std::string part2;
-
   do
   {
     // we get part1 and part2 and keep looping on the new modified string without the part1 and
     // part2 until we find not %H, %M or %S at all
-    auto const pp = _split_timestamp_format_once(timestamp_format);
-    part1 = pp.first;
-    part2 = pp.second;
+    auto const [part1, part2] = _split_timestamp_format_once(timestamp_format);
 
     if (!part1.empty())
     {

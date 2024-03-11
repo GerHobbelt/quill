@@ -15,6 +15,8 @@
   // assume x86-64 ..
   #if defined(_WIN32)
     #include <intrin.h>
+  #elif __has_include(<x86gprintrin.h>)
+    #include <x86gprintrin.h>
   #else
     #include <x86intrin.h>
   #endif

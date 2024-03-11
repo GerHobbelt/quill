@@ -28,7 +28,13 @@ void quill_benchmark(std::vector<int32_t> const& thread_count_array,
 
   // Create a file handler to write to a file
   std::shared_ptr<quill::Handler> file_handler =
-    quill::file_handler("quill_hot_path_rdtsc_clock.log", "w");
+    quill::file_handler("quill_hot_path_rdtsc_clock.log",
+                        []()
+                        {
+                          quill::FileHandlerConfig cfg;
+                          cfg.set_open_mode('w');
+                          return cfg;
+                        }());
 
   quill::Logger* logger = quill::create_logger("bench_logger", std::move(file_handler));
 
@@ -64,7 +70,4 @@ void quill_benchmark(std::vector<int32_t> const& thread_count_array,
 }
 
 /***/
-int main(int argc, char* argv[])
-{
-  quill_benchmark(THREAD_LIST_COUNT, ITERATIONS, MESSAGES_PER_ITERATION);
-}
+int main(int, char**) { quill_benchmark(THREAD_LIST_COUNT, ITERATIONS, MESSAGES_PER_ITERATION); }

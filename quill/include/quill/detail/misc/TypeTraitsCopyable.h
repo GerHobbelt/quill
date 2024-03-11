@@ -5,10 +5,14 @@
 
 #pragma once
 
+#include <functional>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <type_traits>
 #include <utility>
+
+#include "quill/Fmt.h"
 
 /**
  * Below are type traits to determine whether an object is marked as copyable.
@@ -58,17 +62,20 @@ struct remove_cvref
 template< class T >
 using remove_cvref_t = typename remove_cvref<T>::type;
 
+template <typename Arg>
+constexpr size_t array_size_v = std::extent<remove_cvref_t<Arg>>::value;
+
 /**
- * fmt::streamed detection
+ * fmtquill::streamed detection
  */
-#if FMT_VERSION >= 90000
+#if QUILL_FMT_VERSION >= 90000
 template<typename T>
 struct is_fmt_stream_view : std::false_type
 {
 };
 
 template<typename T>
-struct is_fmt_stream_view<fmt::detail::streamed_view<T>> : std::true_type
+struct is_fmt_stream_view<fmtquill::detail::streamed_view<T>> : std::true_type
 {
 };
 
@@ -164,6 +171,15 @@ using is_string_t = typename is_string<remove_cvref_t<T>>::type;
 
 template <typename T>
 constexpr bool is_string_v = is_string<remove_cvref_t<T>>::value;
+
+/**
+ * is std::reference_wrapper ?
+ */
+template <typename T>
+struct is_reference_wrapper : std::false_type {};
+
+template <typename T>
+struct is_reference_wrapper<std::reference_wrapper<T>> : std::true_type {};
 
 /**
  * Check if each element of the pair is copyable
@@ -265,6 +281,25 @@ struct is_copyable_tuple<std::tuple<Ts...>>
 };
 
 /**
+ * check for copyable elements in optional
+ */
+template <typename T>
+struct is_copyable_optional : std::false_type
+{
+};
+
+template <typename T>
+struct is_copyable_optional<std::optional<T>> : is_copyable<remove_cvref_t<T>>
+{
+};
+
+template <typename T>
+using is_copyable_optional_t = typename is_copyable_optional<remove_cvref_t<T>>::type;
+
+template <typename T>
+constexpr bool is_copyable_optional_v = is_copyable_optional<remove_cvref_t<T>>::value;
+
+/**
  * A user defined object that was tagged by the user to be copied
  */
 template <typename T>
@@ -286,18 +321,21 @@ struct is_user_registered_copyable : std::conjunction<std::is_class<T>,
 {};
 
 /**
- * An object is copyable if it meets one of the following criteria
+ * An object is copyable if it meets one of the following criteria AND is not a std::reference_wrapper
  */
 template <typename T>
-struct filter_copyable : std::disjunction<std::is_arithmetic<T>,
+struct filter_copyable : std::conjunction<std::disjunction<std::is_arithmetic<T>,
                                      is_string<T>,
                                      std::is_trivial<T>,
+                                     std::is_trivially_copyable<T>,
                                      is_user_defined_copyable<T>,
                                      is_user_registered_copyable<T>,
                                      is_copyable_pair<T>,
                                      is_copyable_tuple<T>,
+                                     is_copyable_optional<T>,
                                      is_copyable_container<T>
-                                     >
+                                     >, std::negation<is_reference_wrapper<T>>,
+                                        std::negation<std::is_base_of<fmtquill::detail::view, T>>>
 {};
 
 /**

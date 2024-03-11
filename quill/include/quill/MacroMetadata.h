@@ -29,8 +29,8 @@ public:
   };
 
   constexpr MacroMetadata(std::string_view lineno, std::string_view pathname, std::string_view fileline,
-                          std::string_view func, std::string_view message_format, LogLevel level, 
-      Event event, bool is_structured_log_template)
+                          std::string_view func, std::string_view message_format, LogLevel level,
+                          Event event, bool is_structured_log_template, bool is_printf_format)
     : _func(func),
       _pathname(pathname),
       _filename(_extract_source_file_name(_pathname)),
@@ -39,14 +39,15 @@ public:
       _lineno(lineno),
       _level(level),
       _event(event),
-      _is_structured_log_template(is_structured_log_template)
+      _is_structured_log_template(is_structured_log_template),
+      _is_printf_format(is_printf_format)
   {
   }
 
 #if defined(_WIN32)
   constexpr MacroMetadata(std::string_view lineno, std::string_view pathname, std::string_view fileline,
-                          std::string_view func, std::wstring_view message_format, LogLevel level, 
-                          Event event, bool is_structured_log_template)
+                          std::string_view func, std::wstring_view message_format, LogLevel level,
+                          Event event, bool is_structured_log_template, bool is_printf_format)
     : _func(func),
       _pathname(pathname),
       _filename(_extract_source_file_name(_pathname)),
@@ -55,6 +56,7 @@ public:
       _level(level),
       _event(event),
       _is_structured_log_template(is_structured_log_template),
+      _is_printf_format(is_printf_format),
       _has_wide_char{true},
       _wmessage_format(message_format)
   {
@@ -117,14 +119,6 @@ public:
   /**
    * @return  The log level of this logging event as a string
    */
-  QUILL_NODISCARD QUILL_ATTRIBUTE_HOT std::string_view level_as_str() const noexcept
-  {
-    return loglevel_to_string(_level);
-  }
-
-  /**
-   * @return  The log level of this logging event as a string
-   */
   QUILL_NODISCARD QUILL_ATTRIBUTE_HOT std::string_view level_id_as_str() const noexcept
   {
     return loglevel_to_string_id(_level);
@@ -135,6 +129,11 @@ public:
   QUILL_NODISCARD_ALWAYS_INLINE_HOT constexpr bool is_structured_log_template() const noexcept
   {
     return _is_structured_log_template;
+  }
+
+  QUILL_NODISCARD_ALWAYS_INLINE_HOT constexpr bool is_printf_format() const noexcept
+  {
+    return _is_printf_format;
   }
 
 #if defined(_WIN32)
@@ -181,6 +180,7 @@ private:
   LogLevel _level{LogLevel::None};
   Event _event{Event::Log};
   bool _is_structured_log_template{false};
+  bool _is_printf_format{false};
 
 #if defined(_WIN32)
   bool _has_wide_char{false};

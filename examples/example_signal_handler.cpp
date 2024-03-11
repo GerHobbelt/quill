@@ -24,7 +24,9 @@ void stack_overflow()
 void infinite_loop()
 {
   /* break out with ctrl+c to test SIGINT handling */
-  while (1) {};
+  while (1)
+  {
+  };
 }
 
 void illegal_instruction() { raise(SIGILL); }
@@ -55,14 +57,14 @@ int main()
   std::vector<std::thread> threads;
   for (size_t i = 0; i < 4; ++i)
   {
-    threads.emplace_back(std::thread([]() {
-
+    threads.emplace_back(std::thread(
+      []()
+      {
 #if defined(_WIN32)
-      // NOTE: On windows the signal handler must be installed on each new thread
-      quill::init_signal_handler();
+        // NOTE: On windows the signal handler must be installed on each new thread
+        quill::init_signal_handler();
 #endif
-
-      // sleep for 1 second so all threads are ready
+        // sleep for 1 second so all threads are ready
         std::this_thread::sleep_for(std::chrono::seconds{1});
 
         for (size_t i = 0; i < 10; ++i)
@@ -82,10 +84,9 @@ int main()
       }));
   }
 
-  uint32_t cnt{0};
-  while (true)
+  for (uint32_t cnt{0}; cnt < 1000; ++cnt)
   {
-    std::this_thread::sleep_for(std::chrono::milliseconds{100});
-    LOG_INFO(quill::get_logger(), "Log from main {}", cnt++);
+    std::this_thread::sleep_for(std::chrono::milliseconds{300});
+    LOG_INFO(quill::get_logger(), "Log from main {}", cnt);
   }
 }

@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "quill/detail/misc/Attributes.h"
 #include "quill/detail/misc/Common.h"
 
 #include "quill/Fmt.h"
@@ -20,6 +21,7 @@
 #include "quill/detail/misc/Utilities.h"
 #include <atomic>
 #include <cstdint>
+#include <thread>
 #include <vector>
 
 namespace quill
@@ -48,8 +50,8 @@ public:
    * We align the logger object to it's own cache line. It shouldn't make much difference as the
    * logger object size is exactly 1 cache line
    */
-  void* operator new(size_t i) { return detail::aligned_alloc(detail::CACHE_LINE_ALIGNED, i); }
-  void operator delete(void* p) { detail::aligned_free(p); }
+  void* operator new(size_t i) { return detail::alloc_aligned(i, detail::CACHE_LINE_ALIGNED); }
+  void operator delete(void* p) { detail::free_aligned(p); }
 
   /**
    * @return The log level of the logger
@@ -81,9 +83,27 @@ public:
   template <LogLevel log_statement_level>
   QUILL_NODISCARD_ALWAYS_INLINE_HOT bool should_log() const noexcept
   {
-    if constexpr (QUILL_ACTIVE_LOG_LEVEL > static_cast<uint8_t>(log_statement_level))
+    if constexpr (static_cast<LogLevel>(QUILL_ACTIVE_LOG_LEVEL) > log_statement_level)
     {
       return false;
+    }
+
+    return log_statement_level >= log_level();
+  }
+
+  /**
+   * Checks if the given log_statement_level can be logged by this logger
+   * @param log_statement_level The log level of the log statement to be logged
+   * @return bool if a message can be logged based on the current log level
+   */
+  QUILL_NODISCARD_ALWAYS_INLINE_HOT bool should_log(LogLevel log_statement_level) const noexcept
+  {
+    if constexpr (QUILL_ACTIVE_LOG_LEVEL > 0)
+    {
+      if (static_cast<LogLevel>(QUILL_ACTIVE_LOG_LEVEL) > log_statement_level)
+      {
+        return false;
+      }
     }
 
     return log_statement_level >= log_level();
@@ -99,16 +119,16 @@ public:
    * @param fmt_args arguments
    */
   template <typename TMacroMetadata, typename TFormatString, typename... FmtArgs>
-  QUILL_ALWAYS_INLINE_HOT void log(TFormatString format_string, FmtArgs&&... fmt_args)
+  QUILL_ALWAYS_INLINE_HOT void log(LogLevel dynamic_log_level, TFormatString format_string, FmtArgs&&... fmt_args)
   {
     assert(!_is_invalidated.load(std::memory_order_acquire) && "Invalidated loggers can not log");
 
-#if FMT_VERSION >= 90000
-    static_assert(
-      !detail::has_fmt_stream_view_v<FmtArgs...>,
-      "fmt::streamed(...) is not supported. In order to make a type formattable via std::ostream "
-      "you should provide a formatter specialization inherited from ostream_formatter. "
-      "`template <> struct fmt::formatter<T> : ostream_formatter {};");
+#if QUILL_FMT_VERSION >= 90000
+    static_assert(!detail::has_fmt_stream_view_v<FmtArgs...>,
+                  "fmtquill::streamed(...) is not supported. In order to make a type formattable "
+                  "via std::ostream "
+                  "you should provide a formatter specialization inherited from ostream_formatter. "
+                  "`template <> struct fmtquill::formatter<T> : ostream_formatter {};");
 #endif
 
 #if !defined(QUILL_MODE_UNSAFE)
@@ -122,14 +142,23 @@ public:
     }
 #endif
 
-    if constexpr (TMacroMetadata{}().is_structured_log_template())
+    constexpr MacroMetadata macro_metadata{TMacroMetadata{}()};
+    if constexpr (!macro_metadata.is_printf_format())
     {
-      // if the format statement has named args then we perform our own compile time check
+      if constexpr (macro_metadata.is_structured_log_template())
+      {
+        // if the format statement has named args then we perform our own compile time check
+      }
+      else
+      {
+        // fallback to libfmt check
+        fmtquill::detail::check_format_string<std::remove_reference_t<FmtArgs>...>(format_string);
+      }
     }
     else
     {
-      // fallback to libfmt check
-      fmt::detail::check_format_string<std::remove_reference_t<FmtArgs>...>(format_string);
+      // for printf_format we check earlier inside the macro
+      QUILL_MAYBE_UNUSED constexpr bool ok = detail::check_printf_format_string<FmtArgs...>(format_string);
     }
 
     detail::ThreadContext* const thread_context =
@@ -137,63 +166,98 @@ public:
 
     // For windows also take wide strings into consideration.
 #if defined(_WIN32)
-    constexpr size_t c_string_count = fmt::detail::count<detail::is_type_of_c_string<FmtArgs>()...>() +
-      fmt::detail::count<detail::is_type_of_wide_c_string<FmtArgs>()...>() +
-      fmt::detail::count<detail::is_type_of_wide_string<FmtArgs>()...>();
+    constexpr size_t c_string_count = fmtquill::detail::count<detail::is_type_of_c_string<FmtArgs>()...>() +
+      fmtquill::detail::count<detail::is_type_of_wide_c_string<FmtArgs>()...>() +
+      fmtquill::detail::count<detail::is_type_of_wide_string<FmtArgs>()...>();
 #else
-    constexpr size_t c_string_count = fmt::detail::count<detail::is_type_of_c_string<FmtArgs>()...>();
+    constexpr size_t c_string_count = fmtquill::detail::count<detail::is_type_of_c_string<FmtArgs>()...>();
 #endif
 
     size_t c_string_sizes[(std::max)(c_string_count, static_cast<size_t>(1))];
 
     // Need to reserve additional space as we will be aligning the pointer
-    size_t const total_size = sizeof(detail::Header) + alignof(detail::Header) +
+    size_t total_size = sizeof(detail::Header) + alignof(detail::Header) +
       detail::get_args_sizes<0>(c_string_sizes, fmt_args...);
+
+    if constexpr (macro_metadata.level() == quill::LogLevel::Dynamic)
+    {
+      // For the dynamic log level we want to add to the total size to store the dynamic log level
+      total_size += sizeof(quill::LogLevel);
+    }
 
     // request this size from the queue
     std::byte* write_buffer =
       thread_context->spsc_queue<QUILL_QUEUE_TYPE>().prepare_write(static_cast<uint32_t>(total_size));
 
-    if constexpr (QUILL_QUEUE_TYPE == detail::QueueType::BoundedNonBlocking)
+    if constexpr (QUILL_QUEUE_TYPE == detail::QueueType::UnboundedNoMaxLimit)
+    {
+      assert(write_buffer && "UnboundedNonBlocking will always allocate and get new space");
+    }
+    else if constexpr ((QUILL_QUEUE_TYPE == detail::QueueType::BoundedNonBlocking) ||
+                       (QUILL_QUEUE_TYPE == detail::QueueType::UnboundedDropping))
     {
       if (QUILL_UNLIKELY(write_buffer == nullptr))
       {
         // not enough space to push to queue message is dropped
-        thread_context->increment_dropped_message_counter();
+        thread_context->increment_message_failure_counter();
         return;
       }
     }
-    else if constexpr (QUILL_QUEUE_TYPE == detail::QueueType::BoundedBlocking)
+    else if constexpr ((QUILL_QUEUE_TYPE == detail::QueueType::BoundedBlocking) ||
+                       (QUILL_QUEUE_TYPE == detail::QueueType::UnboundedBlocking))
     {
-      while (write_buffer == nullptr)
+      if (QUILL_UNLIKELY(write_buffer == nullptr))
       {
-        // not enough space to push to queue, keep trying
-        write_buffer =
-          thread_context->spsc_queue<QUILL_QUEUE_TYPE>().prepare_write(static_cast<uint32_t>(total_size));
+        thread_context->increment_message_failure_counter();
+
+        do
+        {
+          if constexpr (QUILL_BLOCKING_QUEUE_RETRY_INTERVAL_NS > 0)
+          {
+            std::this_thread::sleep_for(std::chrono::nanoseconds{QUILL_BLOCKING_QUEUE_RETRY_INTERVAL_NS});
+          }
+
+          // not enough space to push to queue, keep trying
+          write_buffer =
+            thread_context->spsc_queue<QUILL_QUEUE_TYPE>().prepare_write(static_cast<uint32_t>(total_size));
+        } while (write_buffer == nullptr);
       }
     }
 
     // we have enough space in this buffer, and we will write to the buffer
 
     // Then write the pointer to the LogDataNode. The LogDataNode has all details on how to
-    // deserialize the object. We will just serialize the arguments in our queue but we need to
+    // deserialize the object. We will just serialize the arguments in our queue, but we need to
     // look up their types to deserialize them
 
     // Note: The metadata variable here is created during program init time,
     std::byte* const write_begin = write_buffer;
     write_buffer = detail::align_pointer<alignof(detail::Header), std::byte>(write_buffer);
 
+    constexpr bool is_printf_format = macro_metadata.is_printf_format();
+
     new (write_buffer) detail::Header(
-      detail::get_metadata_and_format_fn<TMacroMetadata, FmtArgs...>, std::addressof(_logger_details),
+      detail::get_metadata_and_format_fn<is_printf_format, TMacroMetadata, FmtArgs...>,
+      std::addressof(_logger_details),
       (_logger_details.timestamp_clock_type() == TimestampClockType::Tsc) ? quill::detail::rdtsc()
         : (_logger_details.timestamp_clock_type() == TimestampClockType::System)
-        ? static_cast<uint64_t>(std::chrono::system_clock::now().time_since_epoch().count())
+        ? static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                  std::chrono::system_clock::now().time_since_epoch())
+                                  .count())
         : _custom_timestamp_clock->now());
 
     write_buffer += sizeof(detail::Header);
 
     // encode remaining arguments
     write_buffer = detail::encode_args<0>(c_string_sizes, write_buffer, std::forward<FmtArgs>(fmt_args)...);
+
+    if constexpr (macro_metadata.level() == quill::LogLevel::Dynamic)
+    {
+      // write the dynamic log level
+      std::memcpy(write_buffer, &dynamic_log_level, sizeof(quill::LogLevel));
+      write_buffer += sizeof(quill::LogLevel);
+    }
+
     assert(total_size >= (static_cast<uint32_t>(write_buffer - write_begin)) &&
            "The committed write bytes can not be greater than the requested bytes");
     assert((write_buffer >= write_begin) &&
@@ -220,13 +284,14 @@ public:
       constexpr quill::MacroMetadata operator()() const noexcept
       {
         return quill::MacroMetadata{
-          "",   "", "", "", "{}", LogLevel::Critical, quill::MacroMetadata::Event::InitBacktrace,
-          false};
+          "",    "",   "", "", "{}", LogLevel::Critical, quill::MacroMetadata::Event::InitBacktrace,
+          false, false};
       }
     } anonymous_log_message_info;
 
     // we pass this message to the queue and also pass capacity as arg
-    this->template log<decltype(anonymous_log_message_info)>(FMT_STRING("{}"), capacity);
+    this->template log<decltype(anonymous_log_message_info)>(quill::LogLevel::None,
+                                                             QUILL_FMT_STRING("{}"), capacity);
 
     // Also store the desired flush log level
     _logger_details.set_backtrace_flush_level(backtrace_flush_level);
@@ -246,13 +311,13 @@ public:
       constexpr quill::MacroMetadata operator()() const noexcept
       {
         return quill::MacroMetadata{
-          "",   "", "", "", "", LogLevel::Critical, quill::MacroMetadata::Event::FlushBacktrace,
-          false};
+          "",    "",   "", "", "", LogLevel::Critical, quill::MacroMetadata::Event::FlushBacktrace,
+          false, false};
       }
     } anonymous_log_message_info;
 
-    // we pass this message to the queue and also pass capacity as arg
-    this->template log<decltype(anonymous_log_message_info)>(FMT_STRING(""));
+    // we pass this message to the queue
+    this->template log<decltype(anonymous_log_message_info)>(quill::LogLevel::None, QUILL_FMT_STRING(""));
   }
 
 private:
@@ -305,6 +370,11 @@ private:
   {
     return _is_invalidated.load(std::memory_order_acquire);
   }
+
+  /**
+   * @return The name of the logger
+   */
+  QUILL_NODISCARD std::string const& name() const noexcept { return _logger_details.name(); }
 
 private:
   detail::LoggerDetails _logger_details;

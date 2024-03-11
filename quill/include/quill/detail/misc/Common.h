@@ -7,6 +7,7 @@
 
 #include "quill/TweakMe.h"
 
+#include "quill/detail/misc/Attributes.h"
 #include "quill/Fmt.h"
 #include <functional>
 #include <sstream>
@@ -27,7 +28,9 @@ namespace quill::detail
 {
 enum class QueueType
 {
-  Unbounded,
+  UnboundedBlocking,
+  UnboundedDropping,
+  UnboundedNoMaxLimit,
   BoundedBlocking,
   BoundedNonBlocking
 };
@@ -37,8 +40,12 @@ enum class QueueType
   #define QUILL_QUEUE_TYPE quill::detail::QueueType::BoundedNonBlocking
 #elif defined(QUILL_USE_BOUNDED_BLOCKING_QUEUE)
   #define QUILL_QUEUE_TYPE quill::detail::QueueType::BoundedBlocking
+#elif defined(QUILL_USE_UNBOUNDED_NO_MAX_LIMIT_QUEUE)
+  #define QUILL_QUEUE_TYPE quill::detail::QueueType::UnboundedNoMaxLimit
+#elif defined(QUILL_USE_UNBOUNDED_DROPPING_QUEUE)
+  #define QUILL_QUEUE_TYPE quill::detail::QueueType::UnboundedDropping
 #else
-  #define QUILL_QUEUE_TYPE quill::detail::QueueType::Unbounded
+  #define QUILL_QUEUE_TYPE quill::detail::QueueType::UnboundedBlocking
 #endif
 
 /**
@@ -46,6 +53,10 @@ enum class QueueType
  */
 #if !defined(QUILL_ACTIVE_LOG_LEVEL)
   #define QUILL_ACTIVE_LOG_LEVEL QUILL_LOG_LEVEL_TRACE_L3
+#endif
+
+#if !defined(QUILL_BLOCKING_QUEUE_RETRY_INTERVAL_NS)
+  #define QUILL_BLOCKING_QUEUE_RETRY_INTERVAL_NS 800
 #endif
 
 /**
@@ -160,10 +171,37 @@ constexpr bool detect_structured_log_template(std::wstring_view)
   // we expected the fmt compile time format check to fail
   return false;
 }
+
+constexpr void QUILL_PRINTF_FORMAT_ATTRIBUTE(1, 2) check_printf_args(char const*, ...) {}
+
+template <typename... Args, typename S>
+constexpr bool check_printf_format_string(S format_str)
+{
+  using char_t = typename S::char_type;
+  constexpr auto format = fmtquill::basic_string_view<char_t>(format_str);
+  size_t num_specifiers = 0;
+
+  for (auto it = format.begin(); it != format.end(); ++it)
+  {
+    if (*it == '%')
+    {
+      ++num_specifiers;
+    }
+  }
+
+  if (num_specifiers > sizeof...(Args))
+  {
+    throw std::runtime_error{
+      "Invalid printf format: format string does not match number of arguments"};
+  }
+
+  return true;
+}
+
 } // namespace detail
 
-using transit_event_fmt_buffer_t = fmt::basic_memory_buffer<char, 1>;
-using fmt_buffer_t = fmt::basic_memory_buffer<char, 2048>;
+using transit_event_fmt_buffer_t = fmtquill::basic_memory_buffer<char, 1>;
+using fmt_buffer_t = fmtquill::basic_memory_buffer<char, 2048>;
 
 /**
  * Enum to select a timezone
