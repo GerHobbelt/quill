@@ -1,10 +1,10 @@
-#include "quill/handlers/JsonFileHandler.h"
+#include "quill/handlers/JsonConsoleHandler.h"
 #include "quill/detail/misc/FileUtilities.h" // for fwrite_fully
 
 namespace quill
 {
 /***/
-void JsonFileHandler::write(fmt_buffer_t const& formatted_log_message, TransitEvent const& log_event)
+void JsonConsoleHandler::write(fmt_buffer_t const& formatted_log_message, TransitEvent const& log_event)
 {
   LogLevel const log_level = log_event.log_level();
 
@@ -19,7 +19,7 @@ void JsonFileHandler::write(fmt_buffer_t const& formatted_log_message, TransitEv
 
   for (auto const& [key, value] : log_event.structured_kvs)
   {
-    _json_message.append(fmtquill::format(R"(,"{}":"{}")", key, std::string_view {value.data(), value.size()}));
+    _json_message.append(fmtquill::format(R"(,"{}":"{}")", key, std::string_view{value.data(), value.size()}));
   }
 
   _json_message.append(std::string_view{"}\n"});

@@ -1,3 +1,5 @@
+add_subdirectory(wrapper_lib_example)
+
 add_executable(quill_example_backtrace example_backtrace.cpp)
 target_link_libraries(quill_example_backtrace quill)
 
@@ -63,6 +65,9 @@ target_link_libraries(quill_example_handler_log_levels quill)
 
 add_executable(quill_example_json_structured_log example_json_structured_log.cpp)
 target_link_libraries(quill_example_json_structured_log quill)
+
+add_executable(quill_example_json_structured_log_console example_json_structured_log_console.cpp)
+target_link_libraries(quill_example_json_structured_log_console quill)
 
 add_executable(quill_example_trivial_system_clock example_trivial_system_clock.cpp)
 target_link_libraries(quill_example_trivial_system_clock quill)

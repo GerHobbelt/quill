@@ -284,6 +284,12 @@ bool BackendWorker::_get_transit_event_from_queue(std::byte*& read_pos, ThreadCo
 
         // Also set the dynamic log level to the transit event
         transit_event->log_level_override = dynamic_log_level;
+      } else {
+        // Important: if a dynamic log level is not being used, then this must
+        // not have a value, otherwise the wrong log level may be used later.
+        // We can't assume that this member (or any member of TransitEvent) has
+        // its default value because TransitEvents may be reused.
+        transit_event->log_level_override = std::nullopt;
       }
 #if defined(_WIN32)
     }
@@ -368,8 +374,7 @@ std::pair<std::string, std::vector<std::string>> BackendWorker::_process_structu
 void BackendWorker::_write_transit_event(TransitEvent const& transit_event) const
 {
   // Forward the record to all the logger handlers
-  LogLevel const log_level = transit_event.log_level_override ? *transit_event.log_level_override
-                                                              : transit_event.macro_metadata->log_level();
+  LogLevel const log_level = transit_event.log_level();
 
   for (auto& handler : transit_event.logger_details->handlers())
   {
@@ -380,7 +385,7 @@ void BackendWorker::_write_transit_event(TransitEvent const& transit_event) cons
 
     // If all filters are okay we write this message to the file
     if (handler->apply_filters(transit_event.thread_id, std::chrono::nanoseconds{transit_event.timestamp},
-                               transit_event.log_level(), *transit_event.macro_metadata, formatted_log_message_buffer))
+                               log_level, *transit_event.macro_metadata, formatted_log_message_buffer))
     {
       // log to the handler, also pass the log_message_timestamp this is only needed in some
       // cases like daily file rotation
