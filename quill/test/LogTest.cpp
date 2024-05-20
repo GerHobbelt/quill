@@ -2473,4 +2473,34 @@ TEST_CASE("default_logger_with_very_large_random_strings")
   quill::detail::remove_file(filename);
 }
 
+TEST_CASE("flush_without_any_log")
+{
+  LogManager lm;
+  lm.start_backend_worker(false, std::initializer_list<int32_t>{});
+
+  Logger* default_logger = lm.logger_collection().get_logger();
+  std::atomic<bool> is_flush_done = false;
+
+  std::thread watcher(
+    [&is_flush_done]()
+    {
+      uint32_t try_count = 2000;
+      while (!is_flush_done.load() && try_count--)
+      {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
+      REQUIRE_EQ(is_flush_done.load(), true);
+    });
+
+  std::thread frontend(
+    [&lm, &is_flush_done]()
+    {
+      lm.flush();
+      is_flush_done = true;
+    });
+
+  frontend.join();
+  watcher.join();
+  lm.stop_backend_worker();
+}
 TEST_SUITE_END();

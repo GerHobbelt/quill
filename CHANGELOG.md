@@ -1,3 +1,4 @@
+- [v3.7.0](#v370)
 - [v3.6.0](#v360)
 - [v3.5.1](#v351)
 - [v3.5.0](#v350)
@@ -54,6 +55,23 @@
 - [v1.2.0](#v120)
 - [v1.1.0](#v110)
 - [v1.0.0](#v100)
+
+## v3.7.0
+
+- Fixed crash triggered by insufficient space in the queue upon invocation
+  of ``flush()``. ([#398](https://github.com/odygrd/quill/pull/398))
+- Fixed windows clang-cl build error. ([#400](https://github.com/odygrd/quill/pull/400))
+- Fixed compilation errors encountered on FreeBSD and extended ``get_thread_id()`` support to various other BSD
+  operating systems. ([#401](https://github.com/odygrd/quill/pull/401))
+- Fix open_file in the FileHandler to also create the parent path before opening the
+  file. ([#395](https://github.com/odygrd/quill/issues/395))
+- Enhance logic for backend thread's flush() invocation; it now triggers only if the handler has previously written
+  data. ([#395](https://github.com/odygrd/quill/issues/395))
+- Address an uncaught exception in the backend thread that could occur when a user manually removes the log file from
+  the terminal while the logger is running. ([#395](https://github.com/odygrd/quill/issues/395))
+- Ensure that after a logger is removed, there are no subsequent calls to the Handler's flush() or run_loop(), provided
+  the Handler is not shared. ([#395](https://github.com/odygrd/quill/issues/395))
+- Update bundled `libfmt` to `v10.2.1`
 
 ## v3.6.0
 
